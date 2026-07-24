@@ -359,18 +359,22 @@ html, body {
   flex-direction: column;
   background: var(--bg-deep);
   height: 100%;
+  min-height: 0; /* CRITICAL FOR FLEXBOX */
   position: relative;
   min-width: 0;
+  overflow: hidden;
 }
 
 .chat-main-header {
   height: 59px;
+  min-height: 59px;
   background: var(--bg-header);
   padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0; /* Header never shrinks */
 }
 
 .active-user-meta {
@@ -389,8 +393,7 @@ html, body {
 
 .messages-viewport {
   flex: 1;
-  height: calc(100vh - 121px);
-  max-height: calc(100vh - 121px);
+  min-height: 0; /* CRITICAL FOR FLEXBOX CHILD SCROLLING */
   padding: 20px 5%;
   overflow-y: auto;
   display: flex;
@@ -497,7 +500,7 @@ html, body {
 
 /* Barra de Composición de Respuestas */
 .compose-bar {
-  height: 62px;
+  min-height: 62px;
   background: var(--bg-header);
   display: flex;
   align-items: center;
@@ -505,6 +508,8 @@ html, body {
   padding: 8px 18px;
   border-top: 1px solid var(--border-color);
   position: relative;
+  flex-shrink: 0; /* Compose bar NEVER shrinks or gets pushed off screen */
+  z-index: 10;
 }
 
 .compose-icon {
@@ -1381,8 +1386,10 @@ html, body {
   }
 
   .messages-viewport {
-    height: calc(100dvh - 170px);
-    height: calc(100vh - 170px);
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
     padding: 12px 10px;
   }
 
@@ -1391,7 +1398,13 @@ html, body {
   }
 
   .compose-bar {
-    padding: 8px 10px;
+    min-height: 56px !important;
+    padding: 6px 10px !important;
+    flex-shrink: 0 !important;
+    position: relative;
+    z-index: 10;
+    background: var(--bg-header);
+    border-top: 1px solid var(--border-color);
   }
   
   /* Inbox View Mobile Layout */
