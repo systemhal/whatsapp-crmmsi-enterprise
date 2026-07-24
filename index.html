@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Enterprise CRM</title>
+  <link rel="icon" type="image/png" href="icono.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .view-panel { display: none !important; width: 100%; height: 100%; }
+    .view-panel.active-view { display: flex !important; }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- Barra de Navegación Lateral (SOLO 2 PESTAÑAS PRINCIPALES: CHATS Y KANBAN) -->
+  <nav class="main-nav">
+    <div class="nav-brand" title="MSI Aduanas CRM" style="background:transparent;">
+      <img src="icono.png" alt="Logo" style="width:42px; height:42px; object-fit:contain; filter:drop-shadow(0 4px 8px rgba(0,0,0,0.4));">
+    </div>
+    <div class="nav-menu">
+      <div class="nav-item active" data-view="inboxView" title="Bandeja de Chats (Inbox)">
+        <i class="ri-chat-3-line"></i>
+      </div>
+      <div class="nav-item" data-view="surveysView" title="Gestor de Encuestas CSAT">
+        <i class="ri-survey-line"></i>
+      </div>
+    </div>
+    <div class="nav-footer">
+      <div class="nav-item" id="themeToggleBtn" title="Cambiar Tema (Claro/Oscuro)" onclick="toggleTheme()">
+        <i class="ri-sun-line" id="themeIcon"></i>
+      </div>
+      <div class="nav-item" id="soundToggleBtn" title="Notificación Sonora Activada" onclick="toggleSound()">
+        <i class="ri-volume-up-line" style="color:var(--wa-green)"></i>
+      </div>
+      <div class="nav-item" title="Bloquear CRM" onclick="lockPanel()" style="color:var(--accent-red)">
+        <i class="ri-lock-line"></i>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Área Principal de Trabajo -->
+  <main class="workspace-area">
+
+    <!-- ====================================================================
+         VISTA 1: CHAT INBOX EN VIVO (Estilo WhatsApp Web)
+         ==================================================================== -->
+    <section class="view-panel inbox-view active-view" id="inboxView">
+      <!-- Lista de Chats -->
+      <aside class="chat-sidebar">
+        <div class="sidebar-header">
+          <h2><i class="ri-chat-smile-2-line" style="color:var(--wa-green)"></i> Conversaciones</h2>
+          <div class="hdr-actions">
+            <i class="ri-refresh-line" title="Actualizar Datos" onclick="loadChats()"></i>
+          </div>
+        </div>
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <i class="ri-search-line"></i>
+            <input type="text" id="searchInput" placeholder="Buscar por nombre o teléfono..." oninput="renderChatList()">
+          </div>
+        </div>
+        <div class="chats-scroll-list" id="chatsListContainer"></div>
+      </aside>
+
+      <!-- Panel de Chat Activo -->
+      <section class="chat-main">
+        <!-- Header del Chat Seleccionado -->
+        <div class="chat-main-header" id="chatHeader" style="display:none">
+          <div class="active-user-meta">
+            <i class="ri-arrow-left-line mobile-back-btn" onclick="closeChatMobile()" style="font-size: 1.4rem; margin-right: 12px; cursor: pointer; display: none;"></i>
+            <div class="avatar" id="activeHdrAvatar">MSI</div>
+            <div>
+              <h3 id="activeHdrName" style="font-size:0.98rem;">—</h3>
+              <div class="user-status-text">
+                <span>● Línea WhatsApp Cloud API Activa</span> • <span id="activeHdrPhone">+51 000 000 000</span>
+              </div>
+            </div>
+          </div>
+          <i class="ri-more-2-fill" style="color:var(--text-muted);cursor:pointer;" title="Más opciones" onclick="toggleDetailsMobile()"></i>
+        </div>
+
+        <!-- Estado Vacío -->
+        <div class="empty-state" id="inboxEmptyState" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);gap:12px;">
+          <i class="ri-whatsapp-line" style="font-size:4.5rem;opacity:0.3;"></i>
+          <p style="font-size:0.95rem;text-align:center;max-width:340px;line-height:1.5;">
+            <strong>WhatsApp Enterprise CRM</strong><br>Selecciona un chat en la lista izquierda para iniciar la atención en vivo.
+          </p>
+        </div>
+
+        <!-- Área de Mensajes -->
+        <div class="messages-viewport" id="messagesViewport" style="display:none"></div>
+
+        <!-- Botón Flotante para Salto al Final -->
+        <div class="scroll-bottom-btn" id="scrollBottomBtn" style="display:none" onclick="forceScrollBottom()">
+          <i class="ri-arrow-down-line"></i>
+        </div>
+
+        <!-- Barra de Composición de Respuesta con Adjuntos & Emojis -->
+        <div class="compose-bar" id="composeBar" style="display:none">
+          <i class="ri-emotion-happy-line compose-icon" title="Insertar Emojis" onclick="toggleEmojiPicker()"></i>
+          <i class="ri-attachment-2 compose-icon" title="Enviar Imagen o Documento" onclick="openAttachModal()"></i>
+          <div class="compose-input-wrap">
+            <input type="text" id="messageReplyInput" placeholder="Escribe una respuesta en vivo..." onkeydown="if(event.key==='Enter'){event.preventDefault();sendTextMessage();}">
+          </div>
+          <button class="send-btn" type="button" id="sendMsgBtn" onclick="sendTextMessage()"><i class="ri-send-plane-2-fill"></i></button>
+
+          <!-- Emoji Picker Popover -->
+          <div class="emoji-picker-popover" id="emojiPicker">
+            <div class="emoji-grid" id="emojiGrid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel Derecha: Ficha 360° del Cliente (Zoho CRM Style) -->
+      <aside class="lead-detail-panel" id="leadDetailPanel">
+        <div class="profile-card">
+          <div class="profile-avatar" id="detailAvatar">MSI</div>
+          <h3 id="detailName">Selecciona un Lead</h3>
+          <p id="detailPhone">—</p>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div class="crm-section-title">Etapa del Embudo Comercial</div>
+          <select class="pipeline-selector" id="pipelineStageSelect" onchange="updateClientStageFromDetail(this.value)">
+            <option value="Nuevo Lead">🔵 1. Nuevo Lead</option>
+            <option value="En Contacto">🟡 2. En Contacto</option>
+            <option value="Encuesta Enviada">📋 3. Encuesta Enviada</option>
+            <option value="Cotización">🟣 4. Cotización / Propuesta</option>
+            <option value="Cliente Ganado">🟢 5. Cliente Ganado ✅</option>
+            <option value="Cliente Perdido">🔴 6. Cliente Perdido ❌</option>
+          </select>
+        </div>
+
+        <!-- Métricas de Encuestas Reemplazando el Valor Monetario -->
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div class="crm-section-title">Métricas de Atención</div>
+          <div class="crm-card">
+            <div class="field-row"><span class="lbl">Encuestas Enviadas:</span><span class="val" id="detailSurveysSent" style="color:var(--wa-green);">0</span></div>
+            <div class="field-row"><span class="lbl">Encuestas Respondidas:</span><span class="val" id="detailSurveysAnswered" style="color:#34d399;">0</span></div>
+            <div class="field-row"><span class="lbl">Empresa:</span><span class="val" id="detailCompany">MSI ADUANAS</span></div>
+            <div class="field-row"><span class="lbl">Ejecutivo:</span><span class="val" id="detailAgent">Jade Vega</span></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;" id="detailSurveySection">
+          <div class="crm-section-title">Última Encuesta CSAT</div>
+          <div class="crm-card" id="detailSurveyCard">
+            <p style="font-size:0.8rem;color:var(--text-muted);">Sin respuestas registradas.</p>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+
+
+
+    <!-- ====================================================================
+         VISTA 3: GESTOR DE ENCUESTAS CSAT & AUDITORÍA DE RESPUESTAS
+         ==================================================================== -->
+    <section class="view-panel" id="surveysView" style="padding:24px; flex-direction:column; gap:20px; overflow-y:auto; width:100%;">
+      <!-- Encabezado de la Vista -->
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:16px; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h2 style="font-size:1.4rem; display:flex; align-items:center; gap:10px;">
+            <i class="ri-survey-line" style="color:var(--wa-green)"></i> Reporte & Auditoría de Encuestas CSAT
+          </h2>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
+            Monitoreo en tiempo real de todas las encuestas enviadas y respondidas por los clientes.
+          </p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button style="background:var(--wa-green);color:var(--text-bright);border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="renderSurveysTab()">
+            <i class="ri-refresh-line"></i> Actualizar Reporte
+          </button>
+        </div>
+      </div>
+
+      <!-- Tarjetas KPI Resumen -->
+      <div class="csat-kpi-grid">
+        <div class="csat-kpi-card">
+          <div class="csat-kpi-info">
+            <div class="val" id="kpiTotalSent">0</div>
+            <div class="lbl">Encuestas Enviadas</div>
+          </div>
+          <div class="csat-kpi-icon" style="background:rgba(59, 130, 246, 0.15); color:var(--accent-blue);">
+            <i class="ri-send-plane-fill"></i>
+          </div>
+        </div>
+
+        <div class="csat-kpi-card">
+          <div class="csat-kpi-info">
+            <div class="val" id="kpiTotalAnswered" style="color:#4ade80;">0</div>
+            <div class="lbl">Respondidas</div>
+          </div>
+          <div class="csat-kpi-icon" style="background:rgba(34, 197, 94, 0.15); color:#4ade80;">
+            <i class="ri-checkbox-circle-fill"></i>
+          </div>
+        </div>
+
+        <div class="csat-kpi-card">
+          <div class="csat-kpi-info">
+            <div class="val" id="kpiTotalPending" style="color:#fbbf24;">0</div>
+            <div class="lbl">Sin Responder (Pendientes)</div>
+          </div>
+          <div class="csat-kpi-icon" style="background:rgba(245, 158, 11, 0.15); color:#fbbf24;">
+            <i class="ri-time-fill"></i>
+          </div>
+        </div>
+
+        <div class="csat-kpi-card">
+          <div class="csat-kpi-info">
+            <div class="val" id="kpiAvgScore" style="color:var(--accent-amber);">0.0 / 5</div>
+            <div class="lbl">Promedio CSAT General</div>
+          </div>
+          <div class="csat-kpi-icon" style="background:rgba(245, 158, 11, 0.2); color:var(--accent-amber);">
+            <i class="ri-star-fill"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Envío Rápido + Filtros -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; background:var(--bg-card); padding:16px; border-radius:12px; border:1px solid var(--border-color);">
+        <!-- Filtros Estado -->
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span style="font-size:0.85rem; font-weight:700; color:var(--text-muted); margin-right:4px;">Filtrar:</span>
+          <button class="csat-filter-btn active" id="btnFilterAll" onclick="setCsatFilter('all')">
+            <i class="ri-list-check"></i> Todos (<span id="countAll">0</span>)
+          </button>
+          <button class="csat-filter-btn" id="btnFilterAnswered" onclick="setCsatFilter('answered')">
+            <i class="ri-checkbox-circle-line" style="color:#4ade80"></i> Respondieron (<span id="countAnswered">0</span>)
+          </button>
+          <button class="csat-filter-btn" id="btnFilterPending" onclick="setCsatFilter('pending')">
+            <i class="ri-time-line" style="color:#fbbf24"></i> Sin Responder (<span id="countPending">0</span>)
+          </button>
+        </div>
+
+        <!-- Búsqueda Rápida + Envío Manual -->
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <div style="position:relative;">
+            <i class="ri-search-line" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted);"></i>
+            <input type="text" id="csatSearchInput" onkeyup="filterCsatTable()" placeholder="Buscar cliente o teléfono..." style="padding:8px 12px 8px 36px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-app); color:var(--text-main); font-size:0.85rem; width:220px; outline:none;">
+          </div>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="manualSurveyPhone" placeholder="Teléfono (Ej. 51925030096)" style="padding:8px 12px; border-radius:8px; border:1px solid var(--border-color); background:var(--bg-app); color:var(--text-main); font-size:0.85rem; width:170px; outline:none;">
+            <button onclick="sendManualSurvey()" style="background:var(--wa-green);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:600;font-size:0.85rem;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              <i class="ri-send-plane-line"></i> Enviar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de Encuestas CSAT (Estilo Google Sheets) -->
+      <div class="csat-table-wrapper">
+        <table class="csat-table">
+          <thead>
+            <tr>
+              <th>📅 Fecha y Hora Envío</th>
+              <th>📱 Teléfono del Cliente</th>
+              <th>👤 Nombre del Cliente</th>
+              <th>⏱️ Fecha y Hora Respuesta</th>
+              <th style="text-align:center;">⚡ Rapidez</th>
+              <th style="text-align:center;">🛠️ Técnico</th>
+              <th style="text-align:center;">🤝 Acompañamiento</th>
+              <th style="text-align:center;">🛡️ Respaldo MSI</th>
+              <th style="text-align:center;">🔄 Cambio Ejec.</th>
+              <th style="text-align:center;">⭐ Recomendación</th>
+              <th style="text-align:center;">⚙️ Estado / Acción</th>
+            </tr>
+          </thead>
+          <tbody id="csatTableBody">
+            <!-- Filas generadas dinámicamente por JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Modal para Adjuntar Imágenes y Documentos -->
+<div class="modal-overlay" id="attachModal">
+  <div class="modal-box">
+    <h3 style="font-size:1.1rem;display:flex;align-items:center;gap:8px;"><i class="ri-attachment-2" style="color:var(--wa-green);"></i> Enviar Archivo o Imagen por WhatsApp</h3>
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+      <i class="ri-upload-cloud-2-line"></i>
+      <p style="font-size:0.9rem;margin-bottom:4px;"><strong>Haz clic aquí</strong> para seleccionar o arrastra un archivo</p>
+      <div style="font-size:0.75rem;color:var(--text-muted)">Imágenes (JPG, PNG), PDF, Word, Excel (máx 16 MB)</div>
+    </div>
+    <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp" style="display:none" onchange="handleFileSelect(this)">
+    
+    <div id="fileSelectedInfo" style="display:none;background:var(--bg-header);padding:10px 14px;border-radius:8px;font-size:0.85rem;color:#34d399;font-weight:600;display:flex;align-items:center;gap:8px;">
+      <i class="ri-file-check-line" style="font-size:1.2rem;"></i> <span id="selectedFileName">archivo.pdf</span>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
+      <button style="background:rgba(255,255,255,0.08);color:var(--text-main);border:none;padding:9px 16px;border-radius:8px;cursor:pointer;" onclick="closeAttachModal()">Cancelar</button>
+      <button style="background:var(--wa-green);color:var(--bg-deep);border:none;padding:9px 18px;border-radius:8px;font-weight:700;cursor:pointer;" id="btnSendFile" onclick="sendFileAttachment()" disabled><i class="ri-send-plane-fill"></i> Enviar Archivo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pantalla de Seguridad PIN -->
+<div class="auth-modal-overlay" id="authOverlay">
+  <div class="auth-modal-card">
+    <div class="auth-logo"><i class="ri-shield-keyhole-line"></i></div>
+    <h2>Acceso Restringido</h2>
+    <p>Introduce la clave corporativa de seguridad para ingresar al CRM de MSI ADUANAS.</p>
+    <input type="password" class="auth-input" id="authPinInput" placeholder="Clave de Seguridad" onkeypress="if(event.key==='Enter')submitAuthPin()">
+    <button class="auth-btn" onclick="submitAuthPin()"><i class="ri-lock-unlock-line"></i> Ingresar al Panel</button>
+    <div id="authError" style="color:var(--accent-red);font-size:0.78rem;margin-top:10px;display:none;">Clave incorrecta. Inténtalo nuevamente.</div>
+  </div>
+</div>
+
+<!-- Toast Notification Container -->
+<div id="toastContainer" style="position:fixed; top:20px; right:20px; display:flex; flex-direction:column; gap:10px; z-index:9999;"></div>
+
+<!-- Custom Confirm Modal -->
+<div class="modal-overlay" id="customConfirmModal">
+  <div class="modal-box" style="text-align:center; max-width:320px;">
+    <div style="font-size:3rem; color:var(--wa-green); margin-bottom:10px;"><i class="ri-question-line"></i></div>
+    <h3 style="font-size:1.2rem; margin-bottom:10px; color:var(--text-bright);">Confirmar Acción</h3>
+    <p id="customConfirmText" style="font-size:0.9rem; color:var(--text-muted); margin-bottom:20px;">¿Estás seguro?</p>
+    <div style="display:flex; justify-content:center; gap:10px;">
+      <button style="background:rgba(255,255,255,0.08);color:var(--text-main);border:none;padding:10px 20px;border-radius:8px;cursor:pointer;" onclick="closeCustomConfirm(false)">Cancelar</button>
+      <button style="background:var(--wa-green);color:var(--bg-deep);border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="closeCustomConfirm(true)">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+  <!-- Lógica Principal con Cache-Busting -->
+  <script src="app.js?v=20260724_v8"></script>
+</body>
+</html>
