@@ -1430,7 +1430,11 @@ html, body {
     top: 0;
     left: 0;
     height: 100%;
+    min-height: 0 !important;
     z-index: 5;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
   }
   
   /* Active Chat Mobile State */
