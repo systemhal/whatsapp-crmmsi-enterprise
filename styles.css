@@ -954,11 +954,14 @@ html, body {
 
 .csat-table-wrapper {
   width: 100%;
+  max-height: 540px;
   overflow-x: auto;
+  overflow-y: auto;
   border-radius: 12px;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
   box-shadow: var(--shadow-main);
+  position: relative;
 }
 
 .csat-table {
@@ -970,14 +973,30 @@ html, body {
 }
 
 .csat-table th {
+  position: sticky;
+  top: 0;
+  z-index: 15;
   background: #15803d;
   color: #ffffff;
   padding: 12px 14px;
   font-weight: 700;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
   white-space: nowrap;
   font-size: 0.82rem;
   letter-spacing: 0.3px;
+  user-select: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.csat-table th:hover {
+  background: #166534;
+}
+
+.csat-table th .sort-icon {
+  margin-left: 4px;
+  font-size: 0.75rem;
+  opacity: 0.8;
 }
 
 .csat-table td {
@@ -1021,6 +1040,65 @@ html, body {
 }
 .status-badge.answered { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
 .status-badge.pending { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+
+/* ALTO CONTRASTE PARA MODO CLARO EN ESTADO/ACCIÓN Y TABLA */
+[data-theme="light"] .status-badge.answered {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #16a34a;
+  font-weight: 800;
+}
+
+[data-theme="light"] .status-badge.pending {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #d97706;
+  font-weight: 800;
+}
+
+[data-theme="light"] .score-pending {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px dashed #94a3b8;
+}
+
+[data-theme="light"] .csat-table td {
+  color: #0f172a;
+}
+
+.btn-csat-action {
+  background: var(--wa-green-light);
+  color: var(--wa-green);
+  border: 1px solid var(--wa-green);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.15s;
+}
+
+.btn-csat-action:hover {
+  background: var(--wa-green);
+  color: #ffffff;
+}
+
+.btn-csat-delete {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.15s;
+}
+
+.btn-csat-delete:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
 
 .csat-filter-btn {
   background: var(--bg-card);

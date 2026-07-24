@@ -20,7 +20,11 @@ function pad(n) {
 }
 
 function cleanPhoneNum(ph) {
-  return String(ph || '').replace(/\D/g, '');
+  var cleaned = String(ph || '').replace(/\D/g, '');
+  if (cleaned.length === 9 && cleaned.startsWith('9')) {
+    cleaned = '51' + cleaned;
+  }
+  return cleaned;
 }
 
 // ==========================================
@@ -810,7 +814,10 @@ setInterval(function() {
 // VISTA: GESTOR DE ENCUESTAS CSAT & AUDITORÍA
 // ==========================================
 var currentCsatFilter = "all";
+var currentSortCol = "sendTime";
+var currentSortDir = "desc";
 var csatRecords = [];
+var hiddenCsatIds = {};
 
 function renderSurveysTab() {
   var tbody = document.getElementById("csatTableBody");
@@ -839,17 +846,47 @@ function renderSurveysTab() {
       }
     });
 
-    // Si hay encuestas respondidas pero sin evento outbound previo explícito
-    if (surveyFlows.length > surveyOutbounds.length) {
-      var diff = surveyFlows.length - surveyOutbounds.length;
-      for (var k = 0; k < diff; k++) {
-        surveyOutbounds.unshift({ fullStr: surveyFlows[k].fullStr || c.time || "Desconocida" });
+    // Mapeo inteligente de respuestas por proximidad temporal
+    var matchedFlowsMap = {};
+
+    surveyFlows.forEach(function(flow) {
+      var flowTs = flow.ts || parseDateStringToTimestamp(flow.fullStr) || Date.now();
+      var bestIdx = -1;
+      var minDiff = Infinity;
+
+      surveyOutbounds.forEach(function(sent, sIdx) {
+        if (matchedFlowsMap[sIdx]) return;
+        var sentTs = sent.ts || parseDateStringToTimestamp(sent.fullStr) || 0;
+        
+        if (sentTs <= flowTs + 300000) { // margen de 5 min por desfase de hora
+          var diff = Math.abs(flowTs - sentTs);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestIdx = sIdx;
+          }
+        }
+      });
+
+      if (bestIdx !== -1) {
+        matchedFlowsMap[bestIdx] = flow;
+      } else {
+        // Fallback: asociar al outbound libre más cercano
+        for (var sIdx = surveyOutbounds.length - 1; sIdx >= 0; sIdx--) {
+          if (!matchedFlowsMap[sIdx]) {
+            matchedFlowsMap[sIdx] = flow;
+            break;
+          }
+        }
       }
-    }
+    });
 
     surveyOutbounds.forEach(function(sentMsg, idx) {
+      var sTime = sentMsg.fullStr || c.time || "—";
+      var recKey = c.phone + "_" + sTime;
+      if (hiddenCsatIds[recKey]) return; // Omitir eliminados
+
       totalSent++;
-      var flowResp = surveyFlows[idx] || null;
+      var flowResp = matchedFlowsMap[idx] || null;
       var isAnswered = !!flowResp;
 
       if (isAnswered) totalAnswered++;
@@ -866,7 +903,8 @@ function renderSurveysTab() {
       }
 
       csatRecords.push({
-        sendTime: sentMsg.fullStr || c.time || "—",
+        recKey: recKey,
+        sendTime: sTime,
         phone: c.phone,
         name: c.name || ("Cliente " + c.phone),
         respTime: flowResp ? (flowResp.fullStr || "Respondida") : "⏳ Pendiente",
@@ -880,9 +918,6 @@ function renderSurveysTab() {
       });
     });
   });
-
-  // Ordenar de más reciente a más antiguo
-  csatRecords.reverse();
 
   // Actualizar KPI Cards
   var elSent = document.getElementById("kpiTotalSent");
@@ -917,6 +952,51 @@ function setCsatFilter(type) {
   filterCsatTable();
 }
 
+function sortCsatColumn(colKey) {
+  if (currentSortCol === colKey) {
+    currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+  } else {
+    currentSortCol = colKey;
+    currentSortDir = "asc";
+  }
+
+  var keys = ["sendTime", "phone", "name", "respTime", "rapidez", "tecnico", "acompanamiento", "respaldo", "cambio", "recomendacion"];
+  keys.forEach(function(k) {
+    var iconEl = document.getElementById("sort_" + k);
+    if (iconEl) {
+      if (k === currentSortCol) {
+        iconEl.innerText = currentSortDir === "asc" ? "▲" : "▼";
+      } else {
+        iconEl.innerText = "↕";
+      }
+    }
+  });
+
+  filterCsatTable();
+}
+
+function parseDateStringToTimestamp(str) {
+  if (!str || str === "—" || str.indexOf("Pendiente") !== -1) return 0;
+  var parts = String(str).trim().split(" ");
+  if (parts.length < 1) return 0;
+  var dParts = parts[0].split("/");
+  if (dParts.length < 3) return 0;
+
+  var day = parseInt(dParts[0], 10);
+  var month = parseInt(dParts[1], 10) - 1;
+  var year = parseInt(dParts[2], 10);
+
+  var hours = 0, minutes = 0, seconds = 0;
+  if (parts[1]) {
+    var tParts = parts[1].split(":");
+    if (tParts[0]) hours = parseInt(tParts[0], 10);
+    if (tParts[1]) minutes = parseInt(tParts[1], 10);
+    if (tParts[2]) seconds = parseInt(tParts[2], 10);
+  }
+
+  return new Date(year, month, day, hours, minutes, seconds).getTime() || 0;
+}
+
 function filterCsatTable() {
   var tbody = document.getElementById("csatTableBody");
   if (!tbody) return;
@@ -936,6 +1016,31 @@ function filterCsatTable() {
     return true;
   });
 
+  // Aplicar ordenamiento por columna
+  filtered.sort(function(a, b) {
+    var va = a[currentSortCol] || "";
+    var vb = b[currentSortCol] || "";
+
+    // Si se están ordenando fechas
+    if (currentSortCol === "sendTime" || currentSortCol === "respTime") {
+      var ta = parseDateStringToTimestamp(va);
+      var tb = parseDateStringToTimestamp(vb);
+      return currentSortDir === "asc" ? ta - tb : tb - ta;
+    }
+
+    var na = parseFloat(va);
+    var nb = parseFloat(vb);
+    if (!isNaN(na) && !isNaN(nb)) {
+      return currentSortDir === "asc" ? na - nb : nb - na;
+    }
+
+    va = String(va).toLowerCase();
+    vb = String(vb).toLowerCase();
+    if (va < vb) return currentSortDir === "asc" ? -1 : 1;
+    if (va > vb) return currentSortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:30px; color:var(--text-muted);">Sin encuestas registradas que coincidan con el filtro seleccionado.</td></tr>`;
     return;
@@ -945,8 +1050,8 @@ function filterCsatTable() {
     var tr = document.createElement("tr");
     
     var statusHtml = r.isAnswered 
-      ? `<span class="status-badge answered"><i class="ri-checkbox-circle-fill"></i> Respondida</span>`
-      : `<span class="status-badge pending"><i class="ri-time-fill"></i> Pendiente</span> <button onclick="confirmSendSurvey('${r.phone}')" style="background:var(--wa-green-light); color:var(--wa-green); border:1px solid var(--wa-green); border-radius:6px; padding:2px 8px; font-size:0.75rem; cursor:pointer; margin-left:6px; font-weight:700;">Reenviar</button>`;
+      ? `<span class="status-badge answered"><i class="ri-checkbox-circle-fill"></i> Respondida</span> <button onclick="deleteCsatRow('${r.phone}','${r.sendTime}')" class="btn-csat-delete" title="Eliminar registro"><i class="ri-delete-bin-line"></i></button>`
+      : `<span class="status-badge pending"><i class="ri-time-fill"></i> Pendiente</span> <button onclick="confirmSendSurvey('${r.phone}')" class="btn-csat-action" title="Reenviar encuesta">Reenviar</button> <button onclick="deleteCsatRow('${r.phone}','${r.sendTime}')" class="btn-csat-delete" title="Eliminar registro"><i class="ri-delete-bin-line"></i></button>`;
 
     tr.innerHTML = `
       <td style="font-weight:600;">${esc(r.sendTime)}</td>
@@ -959,9 +1064,89 @@ function filterCsatTable() {
       <td style="text-align:center;">${formatScoreBadge(r.respaldo)}</td>
       <td style="text-align:center; font-weight:600; color:var(--text-main);">${esc(r.cambio)}</td>
       <td style="text-align:center;">${formatScoreBadge(r.recomendacion)}</td>
-      <td style="text-align:center;">${statusHtml}</td>
+      <td style="text-align:center; display:flex; align-items:center; justify-content:center; gap:6px;">${statusHtml}</td>
     `;
     tbody.appendChild(tr);
+  });
+}
+
+function exportCsatToExcel() {
+  if (!csatRecords || csatRecords.length === 0) {
+    showToast("info", "No hay registros de encuestas para exportar.");
+    return;
+  }
+
+  var query = (document.getElementById("csatSearchInput") ? document.getElementById("csatSearchInput").value : "").toLowerCase().trim();
+
+  var filtered = csatRecords.filter(function(r) {
+    if (currentCsatFilter === "answered" && !r.isAnswered) return false;
+    if (currentCsatFilter === "pending" && r.isAnswered) return false;
+    if (query) {
+      var matchName = r.name.toLowerCase().indexOf(query) !== -1;
+      var matchPhone = r.phone.indexOf(query) !== -1;
+      if (!matchName && !matchPhone) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    showToast("info", "No hay encuestas filtradas para exportar.");
+    return;
+  }
+
+  var csvContent = "\uFEFF"; // BOM UTF-8 para Excel
+  csvContent += "Fecha y Hora Envío,Teléfono del Cliente,Nombre del Cliente,Fecha y Hora Respuesta,Rapidez de Respuesta,Conocimiento Técnico,Acompañamiento,Respaldo MSI,Cambio de Ejecutivo,Recomendación,Estado\n";
+
+  filtered.forEach(function(r) {
+    var estadoStr = r.isAnswered ? "Respondida" : "Pendiente";
+    var row = [
+      `"${(r.sendTime || '').replace(/"/g, '""')}"`,
+      `"${(r.phone || '').replace(/"/g, '""')}"`,
+      `"${(r.name || '').replace(/"/g, '""')}"`,
+      `"${(r.respTime || '').replace(/"/g, '""')}"`,
+      `"${(r.rapidez || '').replace(/"/g, '""')}"`,
+      `"${(r.tecnico || '').replace(/"/g, '""')}"`,
+      `"${(r.acompanamiento || '').replace(/"/g, '""')}"`,
+      `"${(r.respaldo || '').replace(/"/g, '""')}"`,
+      `"${(r.cambio || '').replace(/"/g, '""')}"`,
+      `"${(r.recomendacion || '').replace(/"/g, '""')}"`,
+      `"${estadoStr}"`
+    ];
+    csvContent += row.join(",") + "\n";
+  });
+
+  var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  var link = document.createElement("a");
+  var now = new Date();
+  var dateStr = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+  link.href = URL.createObjectURL(blob);
+  link.setAttribute("download", "Reporte_CSAT_MSI_Aduanas_" + dateStr + ".csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast("success", "Reporte Excel exportado exitosamente (" + filtered.length + " filas)");
+}
+
+function deleteCsatRow(phone, sendTime) {
+  var key = phone + "_" + sendTime;
+  showCustomConfirm("¿Seguro que deseas eliminar este registro de auditoría de +" + phone + "?", function(confirmed) {
+    if (confirmed) {
+      hiddenCsatIds[key] = true;
+      showToast("success", "Registro de auditoría eliminado.");
+      renderSurveysTab();
+    }
+  });
+}
+
+function confirmClearAllCsat() {
+  showCustomConfirm("⚠️ ¿Deseas eliminar todos los registros del reporte de auditoría actual?", function(confirmed) {
+    if (confirmed) {
+      csatRecords.forEach(function(r) {
+        hiddenCsatIds[r.recKey] = true;
+      });
+      showToast("success", "Reporte de auditoría limpiado correctamente.");
+      renderSurveysTab();
+    }
   });
 }
 

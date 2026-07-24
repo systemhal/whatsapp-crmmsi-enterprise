@@ -174,9 +174,15 @@
             Monitoreo en tiempo real de todas las encuestas enviadas y respondidas por los clientes.
           </p>
         </div>
-        <div style="display:flex; gap:10px;">
-          <button style="background:var(--wa-green);color:var(--text-bright);border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="renderSurveysTab()">
-            <i class="ri-refresh-line"></i> Actualizar Reporte
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button style="background:#16a34a;color:#ffffff;border:none;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 4px 12px rgba(22, 163, 74, 0.3);" onclick="exportCsatToExcel()">
+            <i class="ri-file-excel-2-line" style="font-size:1.1rem;"></i> Exportar a Excel
+          </button>
+          <button style="background:rgba(239, 68, 68, 0.15);color:#ef4444;border:1px solid rgba(239, 68, 68, 0.4);padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="confirmClearAllCsat()">
+            <i class="ri-delete-bin-line" style="font-size:1.1rem;"></i> Eliminar Auditoría
+          </button>
+          <button style="background:var(--wa-green);color:var(--text-bright);border:none;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="renderSurveysTab()">
+            <i class="ri-refresh-line"></i> Actualizar
           </button>
         </div>
       </div>
@@ -255,21 +261,21 @@
         </div>
       </div>
 
-      <!-- Tabla de Encuestas CSAT (Estilo Google Sheets) -->
+      <!-- Tabla de Encuestas CSAT (Estilo Google Sheets con Encabezado Fijo y Ordenable) -->
       <div class="csat-table-wrapper">
         <table class="csat-table">
           <thead>
             <tr>
-              <th>📅 Fecha y Hora Envío</th>
-              <th>📱 Teléfono del Cliente</th>
-              <th>👤 Nombre del Cliente</th>
-              <th>⏱️ Fecha y Hora Respuesta</th>
-              <th style="text-align:center;">⚡ Rapidez</th>
-              <th style="text-align:center;">🛠️ Técnico</th>
-              <th style="text-align:center;">🤝 Acompañamiento</th>
-              <th style="text-align:center;">🛡️ Respaldo MSI</th>
-              <th style="text-align:center;">🔄 Cambio Ejec.</th>
-              <th style="text-align:center;">⭐ Recomendación</th>
+              <th onclick="sortCsatColumn('sendTime')" title="Haz clic para ordenar por fecha de envío">📅 Fecha Envío <span id="sort_sendTime" class="sort-icon">↕</span></th>
+              <th onclick="sortCsatColumn('phone')" title="Haz clic para ordenar por teléfono">📱 Teléfono <span id="sort_phone" class="sort-icon">↕</span></th>
+              <th onclick="sortCsatColumn('name')" title="Haz clic para ordenar por nombre de cliente">👤 Cliente <span id="sort_name" class="sort-icon">↕</span></th>
+              <th onclick="sortCsatColumn('respTime')" title="Haz clic para ordenar por fecha de respuesta">⏱️ Fecha Respuesta <span id="sort_respTime" class="sort-icon">↕</span></th>
+              <th onclick="sortCsatColumn('rapidez')" style="text-align:center;" title="Ordenar por rapidez">⚡ Rapidez <span id="sort_rapidez" class="sort-icon">↕</span></th>
+              <th onclick="sortCsatColumn('tecnico')" style="text-align:center;" title="Ordenar por conocimiento técnico">🛠️ Técnico <span id="sort_tecnico" class="sort-icon">↕</span></th>
+              <th onclick="sortCsatColumn('acompanamiento')" style="text-align:center;" title="Ordenar por acompañamiento">🤝 Acompañamiento <span id="sort_acompanamiento" class="sort-icon">↕</span></th>
+              <th onclick="sortCsatColumn('respaldo')" style="text-align:center;" title="Ordenar por respaldo MSI">🛡️ Respaldo <span id="sort_respaldo" class="sort-icon">↕</span></th>
+              <th onclick="sortCsatColumn('cambio')" style="text-align:center;" title="Ordenar por cambio de ejecutivo">🔄 Cambio Ejec. <span id="sort_cambio" class="sort-icon">↕</span></th>
+              <th onclick="sortCsatColumn('recomendacion')" style="text-align:center;" title="Ordenar por recomendación">⭐ Recomendación <span id="sort_recomendacion" class="sort-icon">↕</span></th>
               <th style="text-align:center;">⚙️ Estado / Acción</th>
             </tr>
           </thead>
@@ -334,6 +340,6 @@
 </div>
 
   <!-- Lógica Principal con Cache-Busting -->
-  <script src="app.js?v=20260724_v9"></script>
+  <script src="app.js?v=20260724_v13"></script>
 </body>
 </html>
