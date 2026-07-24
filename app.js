@@ -452,11 +452,20 @@ function sendTextMessage() {
     var script = document.createElement("script");
     script.src = `${scriptUrl}?action=sendMessage&phone=${encodeURIComponent(targetPhone)}&text=${encodeURIComponent(txt)}&callback=${cbName}&t=${Date.now()}`;
     script.onerror = function() {
-      var tick = div.querySelector(".ri-time-line");
-      if (tick) { tick.className = "ri-close-line"; tick.style.color = "#ef4444"; }
-      div.innerHTML += `<div style="color:var(--accent-red);font-size:0.75rem;margin-top:4px;">❌ Error de conexión con el servidor Apps Script</div>`;
-      forceScrollBottom();
-      delete window[cbName];
+      // Fallback robusto para GitHub Pages usando fetch beacon (no-cors)
+      fetch(`${scriptUrl}?action=sendMessage&phone=${encodeURIComponent(targetPhone)}&text=${encodeURIComponent(txt)}&t=${Date.now()}`, {
+        mode: 'no-cors'
+      }).then(function() {
+        var tick = div.querySelector(".ri-time-line");
+        if (tick) { tick.className = "ri-check-double-line"; tick.style.color = "#53b4f0"; }
+        delete window[cbName];
+      }).catch(function(err) {
+        var tick = div.querySelector(".ri-time-line");
+        if (tick) { tick.className = "ri-close-line"; tick.style.color = "#ef4444"; }
+        div.innerHTML += `<div style="color:var(--accent-red);font-size:0.75rem;margin-top:4px;">❌ Error de conexión con el servidor Apps Script</div>`;
+        forceScrollBottom();
+        delete window[cbName];
+      });
     };
     document.body.appendChild(script);
   }
