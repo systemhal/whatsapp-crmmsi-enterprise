@@ -73,16 +73,16 @@
         <!-- Header del Chat Seleccionado -->
         <div class="chat-main-header" id="chatHeader" style="display:none">
           <div class="active-user-meta">
-            <i class="ri-arrow-left-line mobile-back-btn" onclick="closeChatMobile()" style="font-size: 1.4rem; margin-right: 12px; cursor: pointer; display: none;"></i>
+            <i class="ri-arrow-left-line mobile-back-btn" onclick="closeChatMobile()" title="Volver a lista"></i>
             <div class="avatar" id="activeHdrAvatar">MSI</div>
-            <div>
-              <h3 id="activeHdrName" style="font-size:0.98rem;">—</h3>
-              <div class="user-status-text">
-                <span>● Línea WhatsApp Cloud API Activa</span> • <span id="activeHdrPhone">+51 000 000 000</span>
+            <div style="min-width:0; flex:1; overflow:hidden;">
+              <h3 id="activeHdrName" style="font-size:0.98rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</h3>
+              <div class="user-status-text" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                <span class="status-full-text">● Línea WhatsApp Cloud API Activa • </span><span id="activeHdrPhone">+51 000 000 000</span>
               </div>
             </div>
           </div>
-          <i class="ri-more-2-fill" style="color:var(--text-muted);cursor:pointer;" title="Más opciones" onclick="toggleDetailsMobile()"></i>
+          <i class="ri-more-2-fill" style="color:var(--text-muted);cursor:pointer;font-size:1.3rem;padding:6px;" title="Más opciones" onclick="toggleDetailsMobile()"></i>
         </div>
 
         <!-- Estado Vacío -->
@@ -340,6 +340,6 @@
 </div>
 
   <!-- Lógica Principal con Cache-Busting -->
-  <script src="app.js?v=20260724_v13"></script>
+  <script src="app.js?v=20260724_v19"></script>
 </body>
 </html>
