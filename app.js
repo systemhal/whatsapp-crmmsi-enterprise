@@ -211,21 +211,42 @@ function renderChatList() {
 
     var initials = getInitials(c.name);
     var stage = c.stage || "Nuevo Lead";
+    var unread = c.unreadCount || 0;
+
+    // Verificar si el chat ya fue leído (localStorage)
+    if (unread > 0) {
+      try {
+        var readTs = parseInt(localStorage.getItem('chatRead_' + c.phone) || '0', 10);
+        var lastInboundTs = 0;
+        for (var mi = c.messages.length - 1; mi >= 0; mi--) {
+          if (c.messages[mi].type !== 'outbound') {
+            lastInboundTs = c.messages[mi].ts || 0;
+            break;
+          }
+        }
+        if (readTs > 0 && readTs >= lastInboundTs) {
+          unread = 0; // Ya fue leído
+        }
+      } catch(e) {}
+    }
+    var hasUnread = unread > 0;
 
     var div = document.createElement("div");
-    div.className = "chat-item" + (c.phone === activePhone ? " active-chat" : "");
+    div.className = "chat-item" + (c.phone === activePhone ? " active-chat" : "") + (hasUnread ? " chat-unread" : "");
     div.onclick = (function(ph) { return function() { openChat(ph); }; })(c.phone);
 
+    var unreadBadge = hasUnread ? '<span class="unread-badge">' + unread + '</span>' : '';
+
     div.innerHTML = `
-      <div class="avatar">${initials}</div>
+      <div class="avatar${hasUnread ? ' avatar-unread' : ''}">${initials}</div>
       <div class="chat-info">
         <div class="chat-info-row1">
-          <span class="chat-name">${esc(c.name)}</span>
-          <span class="chat-time">${esc(c.time || '')}</span>
+          <span class="chat-name${hasUnread ? ' name-unread' : ''}">${esc(c.name)}</span>
+          <span class="chat-time${hasUnread ? ' time-unread' : ''}">${esc(c.time || '')}</span>
         </div>
         <div class="chat-info-row2">
-          <span class="last-msg-text">${esc(c.lastMsg || '')}</span>
-          <span class="stage-tag">${esc(stage)}</span>
+          <span class="last-msg-text${hasUnread ? ' msg-unread' : ''}">${esc(c.lastMsg || '')}</span>
+          ${unreadBadge || '<span class="stage-tag">' + esc(stage) + '</span>'}
         </div>
       </div>
     `;
@@ -242,6 +263,12 @@ function forceScrollBottom() {
 }
 function openChat(ph, isAutoRefresh) {
   activePhone = ph;
+
+  // Marcar como leído al abrir el chat (guardar timestamp en localStorage)
+  if (!isAutoRefresh) {
+    try { localStorage.setItem('chatRead_' + ph, String(Date.now())); } catch(e) {}
+  }
+
   if (!isAutoRefresh) renderChatList();
 
   var sidebar = document.querySelector('.chat-sidebar');

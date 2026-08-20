@@ -352,6 +352,58 @@ html, body {
   color: var(--text-main);
 }
 
+/* ==========================================
+   INDICADORES DE MENSAJES NO LEÍDOS
+   ========================================== */
+
+/* Badge verde con número de mensajes no leídos */
+.unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #25d366;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Chat con mensajes no leídos - fondo sutil */
+.chat-item.chat-unread {
+  background: rgba(37, 211, 102, 0.08);
+}
+
+.chat-item.chat-unread:hover {
+  background: rgba(37, 211, 102, 0.14);
+}
+
+/* Nombre en negrita cuando hay no leídos */
+.chat-name.name-unread {
+  font-weight: 800;
+}
+
+/* Hora en verde cuando hay no leídos */
+.chat-time.time-unread {
+  color: #25d366;
+  font-weight: 700;
+}
+
+/* Último mensaje más visible cuando hay no leídos */
+.last-msg-text.msg-unread {
+  color: #111;
+  font-weight: 600;
+}
+
+/* Avatar con borde verde cuando hay no leídos */
+.avatar.avatar-unread {
+  background: linear-gradient(135deg, #25d366, #128c7e);
+  box-shadow: 0 0 0 2px #25d366;
+}
+
 /* Área Central de Conversación */
 .chat-main {
   flex: 1;

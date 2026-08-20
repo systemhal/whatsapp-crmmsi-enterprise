@@ -1023,6 +1023,16 @@ function obtenerChatsEnVivo() {
       }
     }
     
+    // 3. Contar mensajes NO LEÍDOS (inbound después del último outbound)
+    var unread = 0;
+    for (var m = chat.messages.length - 1; m >= 0; m--) {
+      if (chat.messages[m].type === 'outbound') break;
+      if (chat.messages[m].type === 'inbound' || chat.messages[m].type === 'survey_flow') {
+        unread++;
+      }
+    }
+    chat.unreadCount = unread;
+    
     result.push(chat);
   }
 
