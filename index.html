@@ -101,12 +101,6 @@
           <i class="ri-arrow-down-line"></i>
         </div>
 
-        <!-- Aviso de Ventana 24 Horas WhatsApp API -->
-        <div id="window24hNotice" style="display:none; background:rgba(234,179,8,0.12); border:1px solid rgba(234,179,8,0.35); padding:8px 14px; margin:0 12px 6px; border-radius:8px; font-size:0.78rem; color:#facc15; display:flex; align-items:center; gap:8px;">
-          <i class="ri-error-warning-line" style="font-size:1.1rem; flex-shrink:0;"></i>
-          <span><strong>Ventana de 24h:</strong> Han pasado más de 24h desde el último mensaje del cliente. Para contactarlo, utiliza una <strong>plantilla oficial</strong> desde Google Sheets.</span>
-        </div>
-
         <!-- Barra de Composición de Respuesta con Adjuntos & Emojis -->
         <div class="compose-bar" id="composeBar" style="display:none">
           <i class="ri-emotion-happy-line compose-icon" title="Insertar Emojis" onclick="toggleEmojiPicker()"></i>
@@ -164,8 +158,10 @@
     </section>
 
 
+
+
     <!-- ====================================================================
-         VISTA 2: GESTOR DE ENCUESTAS CSAT & AUDITORÍA DE RESPUESTAS
+         VISTA 3: GESTOR DE ENCUESTAS CSAT & AUDITORÍA DE RESPUESTAS
          ==================================================================== -->
     <section class="view-panel" id="surveysView" style="padding:24px; flex-direction:column; gap:20px; overflow-y:auto; width:100%;">
       <!-- Encabezado de la Vista -->
@@ -343,9 +339,7 @@
   </div>
 </div>
 
-  <!-- Configuración de Entorno y Variables -->
-  <script src="config.js?v=20260724_v1"></script>
   <!-- Lógica Principal con Cache-Busting -->
-  <script src="app.js?v=20260724_v24"></script>
+  <script src="app.js?v=20260724_v23"></script>
 </body>
 </html>

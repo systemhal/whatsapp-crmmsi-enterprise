@@ -845,14 +845,11 @@ function obtenerChatsEnVivo() {
     }
   }
 
-  // --- PASO 1: Leer mensajes ENTRANTES desde Logs (Optimizado para alto volumen) ---
+  // --- PASO 1: Leer mensajes ENTRANTES desde Logs ---
   var logSheet = ss.getSheetByName("Logs");
   if (logSheet && logSheet.getLastRow() >= 2) {
     var lastRow = logSheet.getLastRow();
-    var maxLogs = 1000;
-    var startRow = Math.max(2, lastRow - maxLogs + 1);
-    var countRows = lastRow - startRow + 1;
-    var logsData = logSheet.getRange(startRow, 1, countRows, 2).getValues();
+    var logsData = logSheet.getRange(2, 1, (lastRow - 1), 2).getValues();
     for (var i = 0; i < logsData.length; i++) {
       try {
         var rawTime = logsData[i][0];
@@ -971,14 +968,11 @@ function obtenerChatsEnVivo() {
     }
   }
 
-  // --- PASO 2: Leer mensajes ENVIADOS desde MensajesEnviados (Optimizado) ---
+  // --- PASO 2: Leer mensajes ENVIADOS desde MensajesEnviados ---
   var envSheet = ss.getSheetByName("MensajesEnviados");
   if (envSheet && envSheet.getLastRow() >= 2) {
     var envLastRow = envSheet.getLastRow();
-    var envMax = 1000;
-    var envStartRow = Math.max(2, envLastRow - envMax + 1);
-    var envCountRows = envLastRow - envStartRow + 1;
-    var envData = envSheet.getRange(envStartRow, 1, envCountRows, 3).getValues();
+    var envData = envSheet.getRange(2, 1, (envLastRow - 1), 3).getValues();
     for (var j = 0; j < envData.length; j++) {
       try {
         var envTime = envData[j][0];
@@ -1028,16 +1022,6 @@ function obtenerChatsEnVivo() {
         chat.lastMsg = lastM.text || "Mensaje recibido";
       }
     }
-    
-    // 3. Contar mensajes NO LEÍDOS (inbound después del último outbound)
-    var unread = 0;
-    for (var m = chat.messages.length - 1; m >= 0; m--) {
-      if (chat.messages[m].type === 'outbound') break;
-      if (chat.messages[m].type === 'inbound' || chat.messages[m].type === 'survey_flow') {
-        unread++;
-      }
-    }
-    chat.unreadCount = unread;
     
     result.push(chat);
   }
