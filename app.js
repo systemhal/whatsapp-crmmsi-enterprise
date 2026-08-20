@@ -13,7 +13,9 @@ var isAuthorized = false;
 var currentDragLeadPhone = null;
 var selectedFileObj = null;
 
-var APPS_SCRIPT_REST_URL = "https://script.google.com/macros/s/AKfycbyFKmFLY3GJVgFFyASRfWgdj4RPke7AAtI8HHOo6WoC7NPFq6EPaUWONEwuVFcU0iDY/exec";
+var APPS_SCRIPT_REST_URL = (typeof ENV_CONFIG !== 'undefined' && ENV_CONFIG.APPS_SCRIPT_URL)
+  ? ENV_CONFIG.APPS_SCRIPT_URL
+  : "https://script.google.com/macros/s/AKfycbyFKmFLY3GJVgFFyASRfWgdj4RPke7AAtI8HHOo6WoC7NPFq6EPaUWONEwuVFcU0iDY/exec";
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -44,8 +46,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
       var activeViewEl = document.getElementById(targetViewId);
       if (activeViewEl) activeViewEl.classList.add("active-view");
-
-      if (targetViewId === "kanbanView") renderKanbanBoard();
+      if (targetViewId === "surveysView") renderSurveysTab();
     });
   });
 
@@ -144,7 +145,6 @@ function processLoadedChats(data) {
       lastChatsHash = newHash;
       chats = chatsData;
       renderChatList();
-      renderKanbanBoard();
       if (activePhone) {
         openChat(activePhone, true);
       } else if (chats && chats.length > 0 && chats[0].phone) {
@@ -211,21 +211,42 @@ function renderChatList() {
 
     var initials = getInitials(c.name);
     var stage = c.stage || "Nuevo Lead";
+    var unread = c.unreadCount || 0;
+
+    // Verificar si el chat ya fue leído (localStorage)
+    if (unread > 0) {
+      try {
+        var readTs = parseInt(localStorage.getItem('chatRead_' + c.phone) || '0', 10);
+        var lastInboundTs = 0;
+        for (var mi = c.messages.length - 1; mi >= 0; mi--) {
+          if (c.messages[mi].type !== 'outbound') {
+            lastInboundTs = c.messages[mi].ts || 0;
+            break;
+          }
+        }
+        if (readTs > 0 && readTs >= lastInboundTs) {
+          unread = 0; // Ya fue leído
+        }
+      } catch(e) {}
+    }
+    var hasUnread = unread > 0;
 
     var div = document.createElement("div");
-    div.className = "chat-item" + (c.phone === activePhone ? " active-chat" : "");
+    div.className = "chat-item" + (c.phone === activePhone ? " active-chat" : "") + (hasUnread ? " chat-unread" : "");
     div.onclick = (function(ph) { return function() { openChat(ph); }; })(c.phone);
 
+    var unreadBadge = hasUnread ? '<span class="unread-badge">' + unread + '</span>' : '';
+
     div.innerHTML = `
-      <div class="avatar">${initials}</div>
+      <div class="avatar${hasUnread ? ' avatar-unread' : ''}">${initials}</div>
       <div class="chat-info">
         <div class="chat-info-row1">
-          <span class="chat-name">${esc(c.name)}</span>
-          <span class="chat-time">${esc(c.time || '')}</span>
+          <span class="chat-name${hasUnread ? ' name-unread' : ''}">${esc(c.name)}</span>
+          <span class="chat-time${hasUnread ? ' time-unread' : ''}">${esc(c.time || '')}</span>
         </div>
         <div class="chat-info-row2">
-          <span class="last-msg-text">${esc(c.lastMsg || '')}</span>
-          <span class="stage-tag">${esc(stage)}</span>
+          <span class="last-msg-text${hasUnread ? ' msg-unread' : ''}">${esc(c.lastMsg || '')}</span>
+          ${unreadBadge || '<span class="stage-tag">' + esc(stage) + '</span>'}
         </div>
       </div>
     `;
@@ -242,6 +263,12 @@ function forceScrollBottom() {
 }
 function openChat(ph, isAutoRefresh) {
   activePhone = ph;
+
+  // Marcar como leído al abrir el chat (guardar timestamp en localStorage)
+  if (!isAutoRefresh) {
+    try { localStorage.setItem('chatRead_' + ph, String(Date.now())); } catch(e) {}
+  }
+
   if (!isAutoRefresh) renderChatList();
 
   var sidebar = document.querySelector('.chat-sidebar');
@@ -255,6 +282,22 @@ function openChat(ph, isAutoRefresh) {
   document.getElementById("messagesViewport").style.display = "flex";
   document.getElementById("composeBar").style.display = "flex";
   document.getElementById("scrollBottomBtn").style.display = "flex";
+
+  // Verificar ventana de 24 horas de WhatsApp
+  var notice24h = document.getElementById("window24hNotice");
+  if (notice24h) {
+    var lastInboundTs = 0;
+    if (c.messages && c.messages.length > 0) {
+      for (var mi = c.messages.length - 1; mi >= 0; mi--) {
+        if (c.messages[mi].type !== "outbound") {
+          lastInboundTs = c.messages[mi].ts || 0;
+          break;
+        }
+      }
+    }
+    var isExpired = lastInboundTs > 0 && (Date.now() - lastInboundTs) > 24 * 60 * 60 * 1000;
+    notice24h.style.display = isExpired ? "flex" : "none";
+  }
 
   var initials = getInitials(c.name);
   document.getElementById("activeHdrAvatar").innerText = initials;
@@ -556,8 +599,7 @@ function sendFileAttachment() {
       }).subirYEnviarArchivo(activePhone, base64Data, fileName, fileType);
     };
     reader.readAsDataURL(fileToUpload);
-  } else {
-    var token = localStorage.getItem("msi_meta_token") || "EAASz43rVNgUBSAbTl8hgBWhe290GQMJ77FrGKGxeLrvYLOopaa3tJH9mSQ1ZAIzqSdDzMAlqM9nIPEXLNZClrngOgjuYM4rNo8C6KdFbESWf9QQJ1W0WWUnQZB3pm16XA3uMQ0gGpxb8ASYG46uA8HwZBYBy4CMUIicPfWNRyQqMxP5RFBsvEWplpTeBUAZDZD";
+    var token = localStorage.getItem("msi_meta_token") || "";
 
     // Upload to Meta
     var formData = new FormData();
@@ -790,7 +832,8 @@ function checkAuthOnLoad() {
 
 function submitAuthPin() {
   var pin = document.getElementById("authPinInput").value.trim();
-  if (pin === "MSI2026*") {
+  var validPin = (typeof ENV_CONFIG !== 'undefined' && ENV_CONFIG.AUTH_PIN) ? ENV_CONFIG.AUTH_PIN : "MSI2026*";
+  if (pin === validPin) {
     isAuthorized = true;
     sessionStorage.setItem("crm_auth_token", "authorized_token_msi");
     document.getElementById("authOverlay").style.display = "none";
@@ -806,9 +849,10 @@ function lockPanel() {
   document.getElementById("authOverlay").style.display = "flex";
 }
 
+var pollRate = (typeof ENV_CONFIG !== 'undefined' && ENV_CONFIG.POLLING_INTERVAL_MS) ? ENV_CONFIG.POLLING_INTERVAL_MS : 8000;
 setInterval(function() {
   if (isAuthorized) loadChats();
-}, 3500);
+}, pollRate);
 
 // ==========================================
 // VISTA: GESTOR DE ENCUESTAS CSAT & AUDITORÍA
@@ -818,6 +862,9 @@ var currentSortCol = "sendTime";
 var currentSortDir = "desc";
 var csatRecords = [];
 var hiddenCsatIds = {};
+try {
+  hiddenCsatIds = JSON.parse(localStorage.getItem("msi_hidden_csat_ids") || "{}");
+} catch(e) { hiddenCsatIds = {}; }
 
 function renderSurveysTab() {
   var tbody = document.getElementById("csatTableBody");
@@ -1132,6 +1179,10 @@ function deleteCsatRow(phone, sendTime) {
   showCustomConfirm("¿Seguro que deseas eliminar este registro de auditoría de +" + phone + "?", function(confirmed) {
     if (confirmed) {
       hiddenCsatIds[key] = true;
+      try { localStorage.setItem("msi_hidden_csat_ids", JSON.stringify(hiddenCsatIds)); } catch(e) {}
+      try {
+        fetch(APPS_SCRIPT_REST_URL + "?action=deleteSurveyLog&phone=" + encodeURIComponent(phone) + "&sendTime=" + encodeURIComponent(sendTime));
+      } catch(e) {}
       showToast("success", "Registro de auditoría eliminado.");
       renderSurveysTab();
     }
@@ -1144,6 +1195,10 @@ function confirmClearAllCsat() {
       csatRecords.forEach(function(r) {
         hiddenCsatIds[r.recKey] = true;
       });
+      try { localStorage.setItem("msi_hidden_csat_ids", JSON.stringify(hiddenCsatIds)); } catch(e) {}
+      try {
+        fetch(APPS_SCRIPT_REST_URL + "?action=deleteSurveyLog&clearAll=true");
+      } catch(e) {}
       showToast("success", "Reporte de auditoría limpiado correctamente.");
       renderSurveysTab();
     }
