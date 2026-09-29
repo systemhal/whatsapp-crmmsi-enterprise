@@ -10,10 +10,14 @@ var knownMsgCountMap = {};
 var soundEnabled = true;
 var audioCtx = null;
 var isAuthorized = false;
+var currentUser = null;          // { id, nombre, alias, rol }
 var currentDragLeadPhone = null;
 var selectedFileObj = null;
 
-var APPS_SCRIPT_REST_URL = "https://script.google.com/macros/s/AKfycbyFKmFLY3GJVgFFyASRfWgdj4RPke7AAtI8HHOo6WoC7NPFq6EPaUWONEwuVFcU0iDY/exec";
+
+var APPS_SCRIPT_REST_URL = (typeof ENV_CONFIG !== 'undefined' && ENV_CONFIG.APPS_SCRIPT_URL)
+  ? ENV_CONFIG.APPS_SCRIPT_URL
+  : "https://script.google.com/macros/s/AKfycbyFKmFLY3GJVgFFyASRfWgdj4RPke7AAtI8HHOo6WoC7NPFq6EPaUWONEwuVFcU0iDY/exec";
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -44,8 +48,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
       var activeViewEl = document.getElementById(targetViewId);
       if (activeViewEl) activeViewEl.classList.add("active-view");
-
-      if (targetViewId === "kanbanView") renderKanbanBoard();
+      if (targetViewId === "surveysView") renderSurveysTab();
     });
   });
 
@@ -54,41 +57,75 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 // ==========================================
-// 2. SISTEMA DE SONIDO (WEB AUDIO API)
+// 2. SISTEMA DE SONIDO DIFERENCIADO (WEB AUDIO API)
 // ==========================================
+
+function _initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// 🔔 Sonido 1: Mensaje entrante nuevo (tono suave doble — igual al anterior)
 function playNotificationSound() {
   if (!soundEnabled) return;
+  playMsgSound();
+}
+
+function playMsgSound() {
+  if (!soundEnabled) return;
   try {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
+    var ctx = _initAudio();
+    var now = ctx.currentTime;
+    var o1 = ctx.createOscillator(), g1 = ctx.createGain();
+    o1.type = 'sine'; o1.frequency.setValueAtTime(1318.51, now);
+    g1.gain.setValueAtTime(0.18, now);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    o1.connect(g1); g1.connect(ctx.destination);
+    o1.start(now); o1.stop(now + 0.12);
+    var o2 = ctx.createOscillator(), g2 = ctx.createGain();
+    o2.type = 'sine'; o2.frequency.setValueAtTime(1760, now + 0.09);
+    g2.gain.setValueAtTime(0.22, now + 0.09);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    o2.connect(g2); g2.connect(ctx.destination);
+    o2.start(now + 0.09); o2.stop(now + 0.32);
+  } catch(e) {}
+}
 
-    var now = audioCtx.currentTime;
-    
-    var osc1 = audioCtx.createOscillator();
-    var gain1 = audioCtx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(1318.51, now);
-    gain1.gain.setValueAtTime(0.18, now);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-    osc1.connect(gain1);
-    gain1.connect(audioCtx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.12);
+// 🎉 Sonido 2: Encuesta respondida (acorde alegre — 3 notas ascendentes)
+function playSurveySound() {
+  if (!soundEnabled) return;
+  try {
+    var ctx = _initAudio();
+    var now = ctx.currentTime;
+    var notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    notes.forEach(function(freq, i) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, now + i * 0.13);
+      g.gain.setValueAtTime(0.20, now + i * 0.13);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.13 + 0.25);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(now + i * 0.13); o.stop(now + i * 0.13 + 0.25);
+    });
+  } catch(e) {}
+}
 
-    var osc2 = audioCtx.createOscillator();
-    var gain2 = audioCtx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(1760, now + 0.09);
-    gain2.gain.setValueAtTime(0.22, now + 0.09);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
-    osc2.connect(gain2);
-    gain2.connect(audioCtx.destination);
-    osc2.start(now + 0.09);
-    osc2.stop(now + 0.32);
+// 🚨 Sonido 3: Alerta del sistema / Token inválido (pulso urgente repetido)
+function playAlertSound() {
+  if (!soundEnabled) return;
+  try {
+    var ctx = _initAudio();
+    var now = ctx.currentTime;
+    [0, 0.20, 0.40].forEach(function(offset) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(880, now + offset);
+      g.gain.setValueAtTime(0.15, now + offset);
+      g.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.15);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(now + offset); o.stop(now + offset + 0.15);
+    });
   } catch(e) {}
 }
 
@@ -99,7 +136,7 @@ function toggleSound() {
     if (soundEnabled) {
       btn.innerHTML = '<i class="ri-volume-up-line" style="color:var(--wa-green)"></i>';
       btn.title = "Notificación Sonora Activada";
-      playNotificationSound();
+      playMsgSound();
     } else {
       btn.innerHTML = '<i class="ri-volume-mute-line" style="color:var(--accent-red)"></i>';
       btn.title = "Notificación Sonora Silenciada";
@@ -108,29 +145,100 @@ function toggleSound() {
 }
 
 function checkNewInboundMessages(newChats) {
-  var hasNewInbound = false;
+  var hasNewMsg = false;
+  var hasNewSurvey = false;
+
   for (var i = 0; i < newChats.length; i++) {
     var c = newChats[i];
     var phone = c.phone;
     var inboundCount = 0;
+    var surveyCount = 0;
+
     for (var j = 0; j < c.messages.length; j++) {
-      if (c.messages[j].type !== 'outbound') {
-        inboundCount++;
-      }
+      var msg = c.messages[j];
+      if (msg.type !== 'outbound') inboundCount++;
+      if (msg.type === 'survey_flow') surveyCount++;
     }
-    
+
     if (knownMsgCountMap[phone] !== undefined) {
-      if (inboundCount > knownMsgCountMap[phone]) {
-        hasNewInbound = true;
-      }
+      if (inboundCount > knownMsgCountMap[phone]) hasNewMsg = true;
     }
+    // Detectar respuesta de encuesta nueva
+    var surveyKey = 'surveyCount_' + phone;
+    var prevSurvey = parseInt(sessionStorage.getItem(surveyKey) || '0', 10);
+    if (surveyCount > prevSurvey && knownMsgCountMap[phone] !== undefined) hasNewSurvey = true;
+    sessionStorage.setItem(surveyKey, String(surveyCount));
+
     knownMsgCountMap[phone] = inboundCount;
   }
-  
-  if (hasNewInbound) {
-    playNotificationSound();
+
+  // Prioridad: encuesta > mensaje normal
+  if (hasNewSurvey) {
+    playSurveySound();
+  } else if (hasNewMsg) {
+    playMsgSound();
   }
 }
+
+// ==========================================
+// ANTI-COLISIÓN ENTRE OPERADORES
+// (BroadcastChannel — funciona entre pestañas del mismo navegador)
+// ==========================================
+var _antiCollisionChannel = null;
+var _antiCollisionMyChat = "";
+
+function initAntiCollision() {
+  try {
+    if (!window.BroadcastChannel) return; // Safari antiguo / entornos sin soporte
+    _antiCollisionChannel = new BroadcastChannel('crm_chat_viewer');
+
+    _antiCollisionChannel.onmessage = function(event) {
+      var data = event.data;
+      if (!data || !data.type) return;
+
+      if (data.type === 'VIEWING' && data.phone) {
+        // Otro operador está viendo un chat
+        if (data.phone === activePhone && data.operador !== (currentUser && currentUser.nombre)) {
+          var notice = document.getElementById('antiCollisionNotice');
+          var txt = document.getElementById('antiCollisionText');
+          if (notice && txt) {
+            txt.innerText = '👁️ ' + (data.operador || 'Otro operador') + ' está viendo este chat';
+            notice.style.display = 'flex';
+          }
+        }
+      }
+
+      if (data.type === 'LEFT' && data.phone === activePhone) {
+        var notice = document.getElementById('antiCollisionNotice');
+        if (notice) notice.style.display = 'none';
+      }
+    };
+  } catch(e) {}
+}
+
+function broadcastViewingChat(phone) {
+  if (!_antiCollisionChannel) return;
+  // Notificar a otras pestañas que este operador está viendo este chat
+  if (_antiCollisionMyChat && _antiCollisionMyChat !== phone) {
+    _antiCollisionChannel.postMessage({ type: 'LEFT', phone: _antiCollisionMyChat });
+  }
+  _antiCollisionMyChat = phone;
+  if (phone) {
+    _antiCollisionChannel.postMessage({
+      type: 'VIEWING',
+      phone: phone,
+      operador: (currentUser && currentUser.nombre) ? currentUser.nombre : 'Operador'
+    });
+  }
+}
+
+function broadcastLeftChat() {
+  if (!_antiCollisionChannel || !_antiCollisionMyChat) return;
+  _antiCollisionChannel.postMessage({ type: 'LEFT', phone: _antiCollisionMyChat });
+  _antiCollisionMyChat = "";
+}
+
+
 
 // ==========================================
 // 3. CARGA DE CHATS (DUAL ENGINE)
@@ -144,7 +252,6 @@ function processLoadedChats(data) {
       lastChatsHash = newHash;
       chats = chatsData;
       renderChatList();
-      renderKanbanBoard();
       if (activePhone) {
         openChat(activePhone, true);
       } else if (chats && chats.length > 0 && chats[0].phone) {
@@ -277,11 +384,33 @@ function openChat(ph, isAutoRefresh) {
   var c = findChat(ph);
   if (!c) return;
 
+  // ── Anti-colisión: notificar a otras pestañas que estoy viendo este chat ──
+  broadcastViewingChat(ph);
+  var collisionNotice = document.getElementById('antiCollisionNotice');
+  if (collisionNotice) collisionNotice.style.display = 'none';
+
   document.getElementById("inboxEmptyState").style.display = "none";
   document.getElementById("chatHeader").style.display = "flex";
   document.getElementById("messagesViewport").style.display = "flex";
   document.getElementById("composeBar").style.display = "flex";
   document.getElementById("scrollBottomBtn").style.display = "flex";
+
+  // Verificar ventana de 24 horas de WhatsApp
+  var notice24h = document.getElementById("window24hNotice");
+  if (notice24h) {
+    var lastInboundTs = 0;
+    if (c.messages && c.messages.length > 0) {
+      for (var mi = c.messages.length - 1; mi >= 0; mi--) {
+        if (c.messages[mi].type !== "outbound") {
+          lastInboundTs = c.messages[mi].ts || 0;
+          break;
+        }
+      }
+    }
+    var isExpired = lastInboundTs > 0 && (Date.now() - lastInboundTs) > 24 * 60 * 60 * 1000;
+    notice24h.style.display = isExpired ? "flex" : "none";
+  }
+
 
   var initials = getInitials(c.name);
   document.getElementById("activeHdrAvatar").innerText = initials;
@@ -311,6 +440,33 @@ function openChat(ph, isAutoRefresh) {
   var lastDate = "";
   var lastSurvey = null;
 
+  // ── Helper: Separador de fecha inteligente (Hoy / Ayer / día de semana) ──
+  function smartDateLabel(dateStr) {
+    if (!dateStr || dateStr === "Fecha Desconocida") return dateStr;
+    // dateStr viene como "DD/MM/YYYY"
+    var parts = dateStr.split("/");
+    if (parts.length !== 3) return dateStr;
+    var d = parseInt(parts[0], 10);
+    var mo = parseInt(parts[1], 10) - 1;
+    var yr = parseInt(parts[2], 10);
+    var msgDate = new Date(yr, mo, d);
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    msgDate.setHours(0,0,0,0);
+    var diffDays = Math.round((today - msgDate) / 86400000);
+    if (diffDays === 0) return "Hoy";
+    if (diffDays === 1) return "Ayer";
+    if (diffDays < 7) {
+      var dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+      return dias[msgDate.getDay()];
+    }
+    var meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+    return d + " de " + meses[mo];
+  }
+
+  // ── Nombre del operador activo para firma en mensajes salientes ──
+  var operadorNombre = (currentUser && currentUser.nombre) ? currentUser.nombre : "";
+
   for (var i = 0; i < c.messages.length; i++) {
     var m = c.messages[i];
     var msgDate = m.dateStr || "Fecha Desconocida";
@@ -319,7 +475,7 @@ function openChat(ph, isAutoRefresh) {
       lastDate = msgDate;
       var dBadge = document.createElement("div");
       dBadge.className = "day-badge";
-      dBadge.innerText = "📅 " + msgDate;
+      dBadge.innerText = smartDateLabel(msgDate);
       viewport.appendChild(dBadge);
     }
 
@@ -345,13 +501,27 @@ function openChat(ph, isAutoRefresh) {
       div.innerHTML = html;
     } else if (m.type === "outbound") {
       div.className = "msg-bubble outbound";
+      // Firma del operador (solo si hay operador activo)
+      var firmaHtml = operadorNombre
+        ? '<span class="msg-operator-name">~ ' + esc(operadorNombre) + '</span>'
+        : '';
+      // Ticks: usar tick-read si tiene msgId (confirmado entregado), tick-delivered si es reciente
+      var tickClass = m.msgId ? "tick-read" : "tick-delivered";
+      var tickIcon = m.msgId
+        ? '<i class="ri-check-double-line ' + tickClass + '"></i>'
+        : '<i class="ri-check-double-line ' + tickClass + '"></i>';
+
       if (m.text && m.text.indexOf("Encuesta") !== -1) {
         div.style.background = "linear-gradient(135deg, var(--wa-green), var(--wa-green-hover))";
         div.style.border = "1px solid var(--border-color)";
         div.style.color = "#ffffff";
-        div.innerHTML = `<div style="font-weight:600;display:flex;align-items:center;gap:6px;"><i class="ri-file-list-3-line" style="font-size:1.1rem;color:rgba(255,255,255,0.8);"></i> ${esc(m.text)}</div><div class="timestamp-tag">📅 ${esc(m.fullStr || '')} <i class="ri-check-double-line" style="color:rgba(255,255,255,0.7);"></i></div>`;
+        div.innerHTML = firmaHtml +
+          `<div style="font-weight:600;display:flex;align-items:center;gap:6px;"><i class="ri-file-list-3-line" style="font-size:1.1rem;color:rgba(255,255,255,0.8);"></i> ${esc(m.text)}</div>` +
+          `<div class="timestamp-tag">${esc(m.fullStr || '')} ${tickIcon}</div>`;
       } else {
-        div.innerHTML = `<div style="color:var(--text-main);">${esc(m.text)}</div><div class="timestamp-tag">📅 ${esc(m.fullStr || '')} <i class="ri-check-double-line" style="color:var(--accent-blue);"></i></div>`;
+        div.innerHTML = firmaHtml +
+          `<div style="color:var(--text-main);">${esc(m.text)}</div>` +
+          `<div class="timestamp-tag">${esc(m.fullStr || '')} ${tickIcon}</div>`;
       }
     } else {
       div.className = "msg-bubble inbound";
@@ -359,8 +529,9 @@ function openChat(ph, isAutoRefresh) {
       if (m.mediaUrl) {
         contentHtml += `<div class="download-attachment-btn" style="margin-top:6px;"><a href="${m.mediaUrl}" target="_blank" style="background:#00a884;color:#fff;padding:6px 12px;border-radius:6px;font-size:0.78rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-weight:600;"><i class="ri-download-2-line"></i> Descargar Archivo Recibido</a></div>`;
       }
-      div.innerHTML = contentHtml + `<div class="timestamp-tag">📅 ${esc(m.fullStr || '')}</div>`;
+      div.innerHTML = contentHtml + `<div class="timestamp-tag">${esc(m.fullStr || '')}</div>`;
     }
+
 
     viewport.appendChild(div);
   }
@@ -429,7 +600,12 @@ function sendTextMessage() {
   var viewport = document.getElementById("messagesViewport");
   var div = document.createElement("div");
   div.className = "msg-bubble outbound";
-  div.innerHTML = `<div>${esc(txt)}</div><div class="timestamp-tag">📅 ${fullStr} <i class="ri-time-line" style="color:var(--text-muted)"></i></div>`;
+  var firmaRT = (currentUser && currentUser.nombre)
+    ? '<span class="msg-operator-name">~ ' + esc(currentUser.nombre) + '</span>'
+    : '';
+  div.innerHTML = firmaRT +
+    `<div>${esc(txt)}</div>` +
+    `<div class="timestamp-tag">${fullStr} <i class="ri-time-line tick-sent"></i></div>`;
   
   var bAnchor = document.getElementById("chatBottomAnchor");
   if (bAnchor) viewport.insertBefore(div, bAnchor);
@@ -440,11 +616,13 @@ function sendTextMessage() {
   var c = findChat(activePhone);
   if (c) {
     var dateStr = day + "/" + mnt + "/" + yr;
-    c.messages.push({ type: "outbound", text: txt, fullStr: fullStr, dateStr: dateStr, ts: now.getTime() });
+    c.messages.push({ type: "outbound", text: txt, fullStr: fullStr, dateStr: dateStr, ts: now.getTime(),
+                      sender: (currentUser && currentUser.nombre) ? currentUser.nombre : "" });
     c.time = fullStr;
     c.lastMsg = "Tú: " + txt.substring(0, 20) + (txt.length > 20 ? "..." : "");
     renderChatList();
   }
+
 
   if (typeof google !== 'undefined' && google.script && google.script.run) {
     google.script.run.withSuccessHandler(function(res) {
@@ -583,8 +761,7 @@ function sendFileAttachment() {
       }).subirYEnviarArchivo(activePhone, base64Data, fileName, fileType);
     };
     reader.readAsDataURL(fileToUpload);
-  } else {
-    var token = localStorage.getItem("msi_meta_token") || "EAASz43rVNgUBSAbTl8hgBWhe290GQMJ77FrGKGxeLrvYLOopaa3tJH9mSQ1ZAIzqSdDzMAlqM9nIPEXLNZClrngOgjuYM4rNo8C6KdFbESWf9QQJ1W0WWUnQZB3pm16XA3uMQ0gGpxb8ASYG46uA8HwZBYBy4CMUIicPfWNRyQqMxP5RFBsvEWplpTeBUAZDZD";
+    var token = localStorage.getItem("msi_meta_token") || "";
 
     // Upload to Meta
     var formData = new FormData();
@@ -803,39 +980,156 @@ function esc(s) {
   return d.innerHTML;
 }
 
-function checkAuthOnLoad() {
-  var token = sessionStorage.getItem("crm_auth_token");
-  if (token) {
-    isAuthorized = true;
-    document.getElementById("authOverlay").style.display = "none";
-    loadChats();
-  } else {
-    isAuthorized = false;
-    document.getElementById("authOverlay").style.display = "flex";
+
+// ==========================================
+// HELPERS DE ROL
+// ==========================================
+function isAdmin() {
+  return currentUser && currentUser.rol === "ADMIN";
+}
+
+function onLoginSuccess(user) {
+  currentUser = user;
+  isAuthorized = true;
+
+  // Mostrar nombre del operador en la barra lateral (si existe el elemento)
+  var nameEl = document.getElementById("currentUserName");
+  if (nameEl) nameEl.innerText = user.nombre + (user.rol === "ADMIN" ? " 👑" : "");
+
+  // ── Restricciones de COLABORADOR ──────────────────────────────────────
+  if (!isAdmin()) {
+    // Ocultar botón "Eliminar Auditoría" en CSAT (solo admin puede borrar)
+    var btnClear = document.querySelector("button[onclick='confirmClearAllCsat()']");
+    if (btnClear) btnClear.style.display = "none";
+
+    // Ocultar banner de alertas del sistema si existe
+    var alertBanner = document.getElementById("systemAlertBanner");
+    if (alertBanner) alertBanner.style.display = "none";
   }
+
+  // ── Iniciar anti-colisión entre pestañas ──────────────────────────────
+  initAntiCollision();
+
+  document.getElementById("authOverlay").style.display = "none";
+  loadChats();
+
+  // Si es admin, verificar estado del Token Meta en el backend
+  if (isAdmin()) {
+    verificarTokenMeta();
+  }
+}
+
+
+function checkAuthOnLoad() {
+  try {
+    var savedSession = sessionStorage.getItem("crm_session_user");
+    if (savedSession) {
+      var user = JSON.parse(savedSession);
+      onLoginSuccess(user);
+      return;
+    }
+  } catch(e) {}
+
+  isAuthorized = false;
+  document.getElementById("authOverlay").style.display = "flex";
 }
 
 function submitAuthPin() {
   var pin = document.getElementById("authPinInput").value.trim();
-  if (pin === "MSI2026*") {
-    isAuthorized = true;
-    sessionStorage.setItem("crm_auth_token", "authorized_token_msi");
-    document.getElementById("authOverlay").style.display = "none";
-    loadChats();
+  var errorEl = document.getElementById("authError");
+
+  var usuarios = (typeof ENV_CONFIG !== "undefined" && ENV_CONFIG.USUARIOS) ? ENV_CONFIG.USUARIOS : [];
+
+  // Fallback: si no hay usuarios definidos en config.js, usar PIN legacy
+  if (usuarios.length === 0) {
+    var legacyPin = (typeof ENV_CONFIG !== "undefined" && ENV_CONFIG.AUTH_PIN) ? ENV_CONFIG.AUTH_PIN : "MSI2026*";
+    if (pin === legacyPin) {
+      var fallbackUser = { id: "USR-000", nombre: "Administrador", alias: "admin", rol: "ADMIN" };
+      sessionStorage.setItem("crm_session_user", JSON.stringify(fallbackUser));
+      onLoginSuccess(fallbackUser);
+    } else {
+      if (errorEl) errorEl.style.display = "block";
+    }
+    return;
+  }
+
+  // Buscar usuario cuyo PIN coincida
+  var matched = null;
+  for (var i = 0; i < usuarios.length; i++) {
+    if (usuarios[i].pin === pin) {
+      matched = usuarios[i];
+      break;
+    }
+  }
+
+  if (matched) {
+    if (errorEl) errorEl.style.display = "none";
+    // Guardamos sin el PIN en sessionStorage (seguridad)
+    var sessionUser = { id: matched.id, nombre: matched.nombre, alias: matched.alias, rol: matched.rol };
+    sessionStorage.setItem("crm_session_user", JSON.stringify(sessionUser));
+    onLoginSuccess(sessionUser);
   } else {
-    document.getElementById("authError").style.display = "block";
+    if (errorEl) errorEl.style.display = "block";
   }
 }
 
 function lockPanel() {
   isAuthorized = false;
-  sessionStorage.removeItem("crm_auth_token");
+  currentUser = null;
+  sessionStorage.removeItem("crm_session_user");
   document.getElementById("authOverlay").style.display = "flex";
+  var pinInput = document.getElementById("authPinInput");
+  if (pinInput) pinInput.value = "";
+  var errorEl = document.getElementById("authError");
+  if (errorEl) errorEl.style.display = "none";
 }
 
+// ==========================================
+// CENTINELA: VERIFICACIÓN SALUD TOKEN META
+// ==========================================
+function verificarTokenMeta() {
+  // Solo el admin ve las alertas del sistema
+  if (!isAdmin()) return;
+
+  var url = APPS_SCRIPT_REST_URL + "?action=checkMetaToken&t=" + Date.now();
+
+  fetch(url)
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      mostrarEstadoToken(data);
+    })
+    .catch(function() {
+      // Si el fetch falla, no mostrar error al usuario (puede ser CORS)
+      // El trigger diario del backend enviará el correo de alerta
+    });
+}
+
+function mostrarEstadoToken(data) {
+  var banner = document.getElementById("systemAlertBanner");
+  if (!banner) return;
+  if (!isAdmin()) { banner.style.display = "none"; return; }
+
+  if (data && data.tokenValido === false) {
+    banner.style.display = "flex";
+    banner.innerHTML = '<i class="ri-error-warning-fill" style="font-size:1.1rem;flex-shrink:0;"></i>' +
+      '<span><strong>⚠️ ALERTA SISTEMA:</strong> El Token de Meta WhatsApp Business está inactivo o caducó. ' +
+      'Renuévalo en Meta Business Suite. Se ha enviado una alerta a ' +
+      (typeof ENV_CONFIG !== "undefined" && ENV_CONFIG.ADMIN_ALERT_EMAIL ? ENV_CONFIG.ADMIN_ALERT_EMAIL : "el administrador") +
+      '.</span>';
+    // Sonar alerta urgente para el admin
+    playAlertSound();
+  } else {
+    banner.style.display = "none";
+  }
+}
+
+
+
+
+var pollRate = (typeof ENV_CONFIG !== 'undefined' && ENV_CONFIG.POLLING_INTERVAL_MS) ? ENV_CONFIG.POLLING_INTERVAL_MS : 8000;
 setInterval(function() {
   if (isAuthorized) loadChats();
-}, 3500);
+}, pollRate);
 
 // ==========================================
 // VISTA: GESTOR DE ENCUESTAS CSAT & AUDITORÍA
@@ -845,6 +1139,9 @@ var currentSortCol = "sendTime";
 var currentSortDir = "desc";
 var csatRecords = [];
 var hiddenCsatIds = {};
+try {
+  hiddenCsatIds = JSON.parse(localStorage.getItem("msi_hidden_csat_ids") || "{}");
+} catch(e) { hiddenCsatIds = {}; }
 
 function renderSurveysTab() {
   var tbody = document.getElementById("csatTableBody");
@@ -1159,6 +1456,10 @@ function deleteCsatRow(phone, sendTime) {
   showCustomConfirm("¿Seguro que deseas eliminar este registro de auditoría de +" + phone + "?", function(confirmed) {
     if (confirmed) {
       hiddenCsatIds[key] = true;
+      try { localStorage.setItem("msi_hidden_csat_ids", JSON.stringify(hiddenCsatIds)); } catch(e) {}
+      try {
+        fetch(APPS_SCRIPT_REST_URL + "?action=deleteSurveyLog&phone=" + encodeURIComponent(phone) + "&sendTime=" + encodeURIComponent(sendTime));
+      } catch(e) {}
       showToast("success", "Registro de auditoría eliminado.");
       renderSurveysTab();
     }
@@ -1171,6 +1472,10 @@ function confirmClearAllCsat() {
       csatRecords.forEach(function(r) {
         hiddenCsatIds[r.recKey] = true;
       });
+      try { localStorage.setItem("msi_hidden_csat_ids", JSON.stringify(hiddenCsatIds)); } catch(e) {}
+      try {
+        fetch(APPS_SCRIPT_REST_URL + "?action=deleteSurveyLog&clearAll=true");
+      } catch(e) {}
       showToast("success", "Reporte de auditoría limpiado correctamente.");
       renderSurveysTab();
     }

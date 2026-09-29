@@ -32,8 +32,21 @@ function onOpen() {
     .addItem('📢 Enviar Aviso Cambio Personal', 'menuEnviarAvisoCambioPersonal')
     .addItem('📋 Crear pestaña EnviosPlantilla', 'crearHojaEnviosPlantilla')
     .addItem('🧹 Limpiar estados EnviosPlantilla', 'limpiarEstadosEnvioPlantilla')
+    .addSeparator()
+    .addItem('🔍 Verificar Estado del Token Meta', 'menuVerificarToken')
     .addToUi();
 }
+
+function menuVerificarToken() {
+  var status = verificarTokenMetaInterno();
+  var ui = SpreadsheetApp.getUi();
+  if (status.tokenValido) {
+    ui.alert('✅ Token Meta — OK', 'El token de WhatsApp Business es VÁLIDO.\nPhone ID confirmado: ' + status.phoneId, ui.ButtonSet.OK);
+  } else {
+    ui.alert('🚨 Token Meta — INVÁLIDO', 'El token NO es válido o está caducado.\n\nError: ' + (status.error || 'Desconocido') + '\nCódigo HTTP: ' + (status.code || 'N/A') + '\n\n⚠️ Renuévalo en Meta Business Suite y actualiza ACCESS_TOKEN en Codigo_gs.js.', ui.ButtonSet.OK);
+  }
+}
+
 
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyFKmFLY3GJVgFFyASRfWgdj4RPke7AAtI8HHOo6WoC7NPFq6EPaUWONEwuVFcU0iDY/exec";
 
@@ -538,9 +551,81 @@ function doGet(e) {
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // ── CENTINELA TOKEN META: Verificación de salud del token (solo admin) ──
+  if (action === 'checkMetaToken') {
+    var tokenStatus = verificarTokenMetaInterno();
+    var cbToken = e.parameter.callback;
+    if (cbToken) {
+      return ContentService.createTextOutput(cbToken + "(" + JSON.stringify(tokenStatus) + ");")
+                           .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(JSON.stringify(tokenStatus))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
   return HtmlService.createHtmlOutput(getCrmHtml())
                     .setTitle("WhatsApp CRM | MSI ADUANAS")
                     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// ==========================================================================
+// 🚨 CENTINELA AUTOMÁTICO — VERIFICACIÓN DIARIA DEL TOKEN META
+// ==========================================================================
+// CONFIGURACIÓN (solo una vez):
+//   En Apps Script: menú ⏰ Activadores > Agregar activador
+//   Función: verificarYAlertarTokenMeta
+//   Tipo: Basado en tiempo > Diariamente > Entre 8:00 y 9:00 AM
+// ==========================================================================
+
+function verificarTokenMetaInterno() {
+  try {
+    var url = "https://graph.facebook.com/v20.0/" + PHONE_NUMBER_ID + "?access_token=" + ACCESS_TOKEN;
+    var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    var code = response.getResponseCode();
+    var body = JSON.parse(response.getContentText());
+    if (code === 200 && body.id) {
+      return { tokenValido: true, phoneId: body.id };
+    } else {
+      var errorMsg = (body.error && body.error.message) ? body.error.message : "Error desconocido";
+      return { tokenValido: false, error: errorMsg, code: code };
+    }
+  } catch(err) {
+    return { tokenValido: false, error: err.toString(), code: 0 };
+  }
+}
+
+function verificarYAlertarTokenMeta() {
+  var status = verificarTokenMetaInterno();
+  if (!status.tokenValido) {
+    var adminEmail = "sistemas@msi.com.pe"; // ← Cambia por el correo del cliente en cada proyecto
+    var asunto = "🚨 URGENTE: Token WhatsApp Business requiere renovación — CRM MSI ADUANAS";
+    var cuerpo = "Estimado Administrador,\n\n" +
+      "El monitor automático del CRM detectó que el Token de Meta WhatsApp Business está inactivo o caducó.\n\n" +
+      "📋 Error detectado:\n" +
+      "   • Código HTTP: " + (status.code || "N/A") + "\n" +
+      "   • Detalle: " + (status.error || "Token inválido") + "\n\n" +
+      "⚠️ CONSECUENCIAS:\n" +
+      "   • No se pueden enviar ni recibir mensajes por WhatsApp.\n" +
+      "   • Las encuestas automáticas están detenidas.\n\n" +
+      "🔧 PASOS PARA RESOLVER:\n" +
+      "   1. Ingresa a Meta Business Suite: https://business.facebook.com\n" +
+      "   2. Ve a Configuración → WhatsApp → API Cloud\n" +
+      "   3. Genera un nuevo Token de Sistema Permanente\n" +
+      "   4. Actualiza ACCESS_TOKEN en Codigo_gs.js y vuelve a publicar la Web App.\n\n" +
+      "Fecha de detección: " + new Date().toLocaleString("es-PE") + "\n" +
+      "— Monitor Automático CRM WhatsApp Enterprise";
+
+    GmailApp.sendEmail(adminEmail, asunto, cuerpo);
+
+    // Registrar en Google Sheets para trazabilidad
+    try {
+      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var logsSheet = ss.getSheetByName("Logs");
+      if (logsSheet) {
+        logsSheet.appendRow([new Date(), "⚠️ CENTINELA: Token Meta inválido — Alerta enviada a " + adminEmail]);
+      }
+    } catch(logErr) {}
+  }
 }
 
 // 2. WEBHOOK DESDE META
@@ -845,11 +930,14 @@ function obtenerChatsEnVivo() {
     }
   }
 
-  // --- PASO 1: Leer mensajes ENTRANTES desde Logs ---
+  // --- PASO 1: Leer mensajes ENTRANTES desde Logs (Optimizado para alto volumen) ---
   var logSheet = ss.getSheetByName("Logs");
   if (logSheet && logSheet.getLastRow() >= 2) {
     var lastRow = logSheet.getLastRow();
-    var logsData = logSheet.getRange(2, 1, (lastRow - 1), 2).getValues();
+    var maxLogs = 1000;
+    var startRow = Math.max(2, lastRow - maxLogs + 1);
+    var countRows = lastRow - startRow + 1;
+    var logsData = logSheet.getRange(startRow, 1, countRows, 2).getValues();
     for (var i = 0; i < logsData.length; i++) {
       try {
         var rawTime = logsData[i][0];
@@ -968,11 +1056,14 @@ function obtenerChatsEnVivo() {
     }
   }
 
-  // --- PASO 2: Leer mensajes ENVIADOS desde MensajesEnviados ---
+  // --- PASO 2: Leer mensajes ENVIADOS desde MensajesEnviados (Optimizado) ---
   var envSheet = ss.getSheetByName("MensajesEnviados");
   if (envSheet && envSheet.getLastRow() >= 2) {
     var envLastRow = envSheet.getLastRow();
-    var envData = envSheet.getRange(2, 1, (envLastRow - 1), 3).getValues();
+    var envMax = 1000;
+    var envStartRow = Math.max(2, envLastRow - envMax + 1);
+    var envCountRows = envLastRow - envStartRow + 1;
+    var envData = envSheet.getRange(envStartRow, 1, envCountRows, 3).getValues();
     for (var j = 0; j < envData.length; j++) {
       try {
         var envTime = envData[j][0];

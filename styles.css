@@ -381,7 +381,7 @@ html, body {
   background: rgba(37, 211, 102, 0.14);
 }
 
-/* Nombre en negrita cuando hay no leídos */
+/* Nombre en negrita cuando hay no leídos (sin cambiar color) */
 .chat-name.name-unread {
   font-weight: 800;
 }
@@ -443,6 +443,11 @@ html, body {
   gap: 6px;
 }
 
+/* ==========================================
+   WHATSAPP WEB PRO — CHAT WALLPAPER
+   ========================================== */
+
+/* Fondo estilo WhatsApp Web con patrón de doodles */
 .messages-viewport {
   flex: 1;
   min-height: 0; /* CRITICAL FOR FLEXBOX CHILD SCROLLING */
@@ -451,6 +456,19 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+
+  /* Wallpaper patrón sutil */
+  background-color: var(--chat-bg, #0f172a);
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0);
+  background-size: 28px 28px;
+}
+
+[data-theme="light"] .messages-viewport {
+  background-color: #e2e8f0;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(0,0,0,0.07) 1px, transparent 0);
+  background-size: 28px 28px;
 }
 
 .messages-viewport::-webkit-scrollbar {
@@ -462,51 +480,127 @@ html, body {
   border-radius: 3px;
 }
 
+/* ==========================================
+   SEPARADOR DE FECHA — ESTILO PÍLDORA
+   ========================================== */
+
 .day-badge {
   align-self: center;
   background: var(--bg-card);
-  color: var(--text-main);
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 6px 18px;
-  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 20px;         /* Píldora */
   margin: 14px 0 6px;
   border: 1px solid var(--border-color);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
+
+/* ==========================================
+   BURBUJAS DE MENSAJE — ESTILO WHATSAPP PRO
+   ========================================== */
 
 .msg-bubble {
   max-width: 68%;
-  padding: 9px 14px 6px;
+  padding: 7px 12px 4px;
   border-radius: 8px;
   font-size: 0.9rem;
   line-height: 1.45;
   position: relative;
   word-wrap: break-word;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
+/* Cola de burbuja entrante (izquierda) */
 .msg-bubble.inbound {
   align-self: flex-start;
   background: var(--bub-in);
   border-top-left-radius: 0;
 }
 
+.msg-bubble.inbound::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid var(--bub-in);
+  border-left: 8px solid transparent;
+}
+
+/* Cola de burbuja saliente (derecha) */
 .msg-bubble.outbound {
   align-self: flex-end;
   background: var(--bub-out);
   border-top-right-radius: 0;
 }
 
+.msg-bubble.outbound::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid var(--bub-out);
+  border-right: 8px solid transparent;
+}
+
+/* ── Firma del operador en mensajes salientes ─ */
+.msg-operator-name {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--wa-green);
+  margin-bottom: 3px;
+  display: block;
+  opacity: 0.9;
+}
+
+/* ── Timestamp + ticks WhatsApp ─────────────── */
 .msg-bubble .timestamp-tag {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 4px;
-  font-size: 0.66rem;
+  gap: 3px;
+  font-size: 0.64rem;
   color: inherit;
-  opacity: 0.65;
-  margin-top: 4px;
+  opacity: 0.6;
+  margin-top: 3px;
   font-weight: 500;
 }
+
+/* Tick enviado (gris) */
+.tick-sent {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.75rem;
+}
+
+/* Tick entregado (gris más visible) */
+.tick-delivered {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.75rem;
+}
+
+/* Tick leído (azul WhatsApp) */
+.tick-read {
+  color: #53b4f0;
+  font-size: 0.75rem;
+}
+
+/* Tick entregado en tema claro */
+[data-theme="light"] .tick-delivered {
+  color: rgba(0,0,0,0.45);
+}
+
+[data-theme="light"] .tick-read {
+  color: #0ea5e9;
+}
+
+
 
 .survey-card-widget {
   background: var(--bg-app);
@@ -1570,3 +1664,182 @@ html, body {
     max-height: calc(100vh - 280px);
   }
 }
+
+/* ==========================================================================
+   AVISO VENTANA 24H — ADAPTABLE A TEMA CLARO Y OSCURO
+   ========================================================================== */
+
+.notice-24h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin: 0 12px 6px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+
+  /* Tema oscuro (por defecto) */
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #fcd34d;
+}
+
+/* Tema claro: texto oscuro para contrastar sobre fondo claro */
+[data-theme="light"] .notice-24h {
+  background: rgba(161, 98, 7, 0.08);
+  border: 1px solid rgba(161, 98, 7, 0.3);
+  color: #92400e;
+}
+
+/* ==========================================================================
+   AVISO ANTI-COLISIÓN — OTRO OPERADOR VIENDO ESTE CHAT
+   ========================================================================== */
+
+.notice-collision {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  margin: 0 12px 4px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+[data-theme="light"] .notice-collision {
+  background: rgba(37, 99, 235, 0.07);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  color: #1d4ed8;
+}
+
+/* ==========================================================================
+   MEJORAS RESPONSIVE MOBILE — DISEÑO TELÉFONO OPTIMIZADO
+   ========================================================================== */
+
+/* Viewport completo en móvil (evita barra de URL del navegador) */
+@supports (height: 100dvh) {
+  @media (max-width: 768px) {
+    html, body, .app-container {
+      height: 100dvh;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  /* Nav lateral se convierte en barra inferior */
+  .main-nav {
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    flex-direction: row !important;
+    padding: 0 8px !important;
+    gap: 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    top: auto !important;
+    z-index: 200 !important;
+    border-top: 1px solid var(--border-color) !important;
+    border-right: none !important;
+    justify-content: space-around !important;
+  }
+
+  .nav-brand {
+    display: none !important;
+  }
+
+  .nav-menu {
+    flex-direction: row !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    justify-content: space-around !important;
+    flex: 1;
+  }
+
+  .nav-footer {
+    flex-direction: row !important;
+    margin-top: 0 !important;
+    gap: 0 !important;
+  }
+
+  #currentUserName {
+    display: none !important;
+  }
+
+  .nav-item {
+    width: 52px !important;
+    height: 48px !important;
+    border-radius: 8px !important;
+  }
+
+  /* El workspace ocupa toda la pantalla menos la nav bar inferior */
+  .workspace-area {
+    width: 100vw !important;
+    height: calc(100vh - 56px) !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Aviso 24h más compacto en móvil */
+  .notice-24h,
+  .notice-collision {
+    margin: 0 6px 4px;
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    border-radius: 6px;
+  }
+
+  /* Chat header más compacto */
+  .chat-main-header {
+    height: 52px !important;
+    min-height: 52px !important;
+    padding: 0 12px !important;
+  }
+
+  /* Texto de nombre del chat más corto */
+  #activeHdrName {
+    font-size: 0.9rem !important;
+  }
+
+  .status-full-text {
+    display: none !important;
+  }
+
+  /* Compose bar táctil amigable */
+  .compose-bar {
+    min-height: 58px !important;
+    padding: 8px 10px !important;
+  }
+
+  .compose-icon {
+    font-size: 1.4rem !important;
+    padding: 8px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .send-btn {
+    min-width: 42px !important;
+    min-height: 42px !important;
+  }
+
+  /* Sistema de alertas en móvil */
+  #systemAlertBanner {
+    font-size: 0.72rem !important;
+    padding: 6px 10px !important;
+  }
+
+  /* Ficha detalle 360 en móvil: ocultar por defecto */
+  .lead-detail-panel {
+    display: none !important;
+  }
+}
+
